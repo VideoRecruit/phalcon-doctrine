@@ -1,0 +1,25 @@
+{
+    "name": "videorecruit/phalcon-doctrine",
+    "type": "library",
+    "description": "Doctrine 2 ORM integration into Phalcon Framework",
+    "keywords": ["phalcon", "doctrine", "orm", "dbal"],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Lukas Tomek",
+            "email": "tomeklukas@gmail.com"
+        }
+    ],
+    "require": {
+        "php": ">=5.4",
+        "kdyby/doctrine": "~2.3"
+    },
+    "suggest": {
+        "ext-redis": "The php redis extension https://github.com/nicolasff/phpredis/ is required for connecting to redis server"
+    },
+    "autoload": {
+        "psr-4": {
+            "VideoRecruit\\": "src/"
+        }
+    }
+}
