@@ -12,7 +12,8 @@
     ],
     "require": {
         "php": ">=5.4",
-        "kdyby/doctrine": "~2.3"
+        "kdyby/doctrine": "~2.3",
+        "nette/di": "~2.3"
     },
     "suggest": {
         "ext-redis": "The php redis extension https://github.com/nicolasff/phpredis/ is required for connecting to redis server"
