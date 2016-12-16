@@ -21,6 +21,7 @@
     "autoload": {
         "psr-4": {
             "VideoRecruit\\": "src/"
-        }
+        },
+        "classmap": ["src/Phalcon/Doctrine/exceptions.php"]
     }
 }
