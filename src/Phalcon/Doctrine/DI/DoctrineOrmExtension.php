@@ -135,7 +135,7 @@ class DoctrineOrmExtension
 		}
 
 		if (!array_key_exists($driver, $this->cacheDriverClasses)) {
-			throw new InvalidArgumentException(sprintf('Unknown cache type specified: %s.', $driver));
+			throw new InvalidArgumentException(sprintf('The `%s` cache driver not supported.', $driver));
 		}
 
 		$className = $this->cacheDriverClasses[$driver];
