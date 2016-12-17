@@ -2,12 +2,12 @@
 
 namespace VideoRecruit\Phalcon\Doctrine\DI;
 
-use Doctrine\ORM\Mapping\DefaultQuoteStrategy;
-use Doctrine\ORM\Mapping\UnderscoreNamingStrategy;
-use Doctrine\ORM\Tools\Setup;
+use Doctrine\Common\Annotations\AnnotationReader;
+use Doctrine\Common\Annotations\AnnotationRegistry;
+use Doctrine\Common\Annotations\CachedReader;
 use Kdyby\Doctrine\Configuration;
-use Kdyby\Doctrine\Connection;
 use Kdyby\Doctrine\EntityManager;
+use Kdyby\Doctrine\Mapping\AnnotationDriver;
 use Nette\DI\Config\Helpers as ConfigHelpers;
 use Phalcon\Config;
 use Phalcon\DiInterface;
@@ -20,9 +20,12 @@ use VideoRecruit\Phalcon\Doctrine\InvalidArgumentException;
  */
 class DoctrineOrmExtension
 {
+	const PREFIX_CACHE = 'videorecruit.doctrine.cache.';
+
 	const ENTITY_MANAGER = 'videorecruit.doctrine.entityManager';
 	const CONNECTION = 'videorecruit.doctrine.connection';
 	const CONFIGURATION = 'videorecruit.doctrine.configuration';
+	const METADATA_DRIVER = 'videorecruit.doctrine.metadataDriver';
 
 	/**
 	 * @var DiInterface
@@ -43,21 +46,29 @@ class DoctrineOrmExtension
 	];
 
 	public $managerDefaults = [
+		'annotationCache' => 'default',
 		'metadataCache' => 'default',
 		'queryCache' => 'default',
 		'resultCache' => 'default',
 		'hydrationCache' => 'default',
 		'classMetadataFactory' => 'Kdyby\Doctrine\Mapping\ClassMetadataFactory',
 		'defaultRepositoryClassName' => 'Kdyby\Doctrine\EntityRepository',
-		'repositoryFactoryClassName' => 'Kdyby\Doctrine\RepositoryFactory',
-		'queryBuilderClassName' => 'Kdyby\Doctrine\QueryBuilder',
+		'repositoryFactoryClassName' => 'Doctrine\ORM\Repository\DefaultRepositoryFactory',
 		'autoGenerateProxyClasses' => FALSE,
 		'namingStrategy' => 'Doctrine\ORM\Mapping\UnderscoreNamingStrategy',
 		'quoteStrategy' => 'Doctrine\ORM\Mapping\DefaultQuoteStrategy',
-		'entityListenerResolver' => 'Kdyby\Doctrine\Mapping\EntityListenerResolver',
+		'entityListenerResolver' => 'Doctrine\ORM\Mapping\DefaultEntityListenerResolver',
 		'proxyDir' => NULL,
 		'proxyNamespace' => 'Kdyby\GeneratedProxy',
 		'metadata' => [],
+	];
+
+	/**
+	 * @var array
+	 */
+	public $cacheDriverClasses = [
+		'default' => 'Doctrine\Common\Cache\ArrayCache',
+		'array' => 'Doctrine\Common\Cache\ArrayCache',
 	];
 
 	/**
@@ -80,6 +91,13 @@ class DoctrineOrmExtension
 
 		$config = $this->mergeConfigs($config, $this->managerDefaults + $this->connectionDefaults);
 
+		$this->loadCache('annotations', $config['annotationCache']);
+		$this->loadCache('metadata', $config['metadataCache']);
+		$this->loadCache('query', $config['queryCache']);
+		$this->loadCache('ormResult', $config['resultCache']);
+		$this->loadCache('hydration', $config['hydrationCache']);
+
+		$this->loadMetadataDriver($config);
 		$this->loadConfiguration($config);
 		$this->loadEntityManager($config);
 	}
@@ -98,6 +116,61 @@ class DoctrineOrmExtension
 	}
 
 	/**
+	 * @param string $suffix
+	 * @param string $cache
+	 * @throws InvalidArgumentException
+	 */
+	private function loadCache($suffix, $cache)
+	{
+		if (!is_string($cache)) {
+			throw new InvalidArgumentException('Doctrine cache has to be specified by a string constant.');
+		}
+
+		$driver = $cache;
+		$cacheServiceName = NULL;
+
+		if (($pos = strpos($cache, '(')) !== FALSE) {
+			$driver = substr($cache, 0, $pos);
+			$cacheServiceName = substr($cache, $pos + 1, -1);
+		}
+
+		if (!array_key_exists($driver, $this->cacheDriverClasses)) {
+			throw new InvalidArgumentException(sprintf('Unknown cache type specified: %s.', $driver));
+		}
+
+		$className = $this->cacheDriverClasses[$driver];
+		$args = [];
+
+		if ($cacheServiceName !== NULL) {
+			$args[] = $this->di->get($cacheServiceName);
+		}
+
+		$this->di->setShared(self::PREFIX_CACHE . $suffix, function () use ($className, $args) {
+			$reflection = new \ReflectionClass($className);
+
+			return $reflection->newInstanceArgs($args);
+		});
+	}
+
+	/**
+	 * @param array $config
+	 */
+	private function loadMetadataDriver(array $config)
+	{
+		$this->di->setShared(self::METADATA_DRIVER, function () use ($config) {
+			$annotationCache = $this->get(self::PREFIX_CACHE . 'annotations');
+			$metadataCache = $this->get(self::PREFIX_CACHE . 'metadata');
+
+			$annotationReader = new CachedReader(new AnnotationReader(), $annotationCache);
+			$driver = new AnnotationDriver($config['metadata'], $annotationReader, $metadataCache);
+
+			AnnotationRegistry::registerLoader("class_exists");
+
+			return $driver;
+		});
+	}
+
+	/**
 	 * @param array $config
 	 * @throws InvalidArgumentException
 	 */
@@ -108,19 +181,28 @@ class DoctrineOrmExtension
 		}
 
 		$this->di->setShared(self::CONFIGURATION, function () use ($config) {
-			$configuration = Setup::createAnnotationMetadataConfiguration(
-				$config['metadata'],
-				$config['autoGenerateProxyClasses'],
-				$config['proxyDir'],
-				NULL,
-				FALSE
-			);
+			$metadataCache = $this->get(self::PREFIX_CACHE . 'metadata');
+			$queryCache = $this->get(self::PREFIX_CACHE . 'query');
+			$resultCache = $this->get(self::PREFIX_CACHE . 'ormResult');
+			$hydrationCache = $this->get(self::PREFIX_CACHE . 'hydration');
 
-			$configuration->setNamingStrategy(new UnderscoreNamingStrategy());
-			$configuration->setQuoteStrategy(new DefaultQuoteStrategy());
-			$configuration->setDefaultRepositoryClassName('Kdyby\Doctrine\EntityDao');
-			$configuration->setProxyNamespace('Kdyby\GeneratedProxy');
-			$configuration->setClassMetadataFactoryName('Kdyby\Doctrine\Mapping\ClassMetadataFactory');
+			$metadataDriver = $this->get(self::METADATA_DRIVER);
+
+			$configuration = new Configuration;
+			$configuration->setMetadataCacheImpl($metadataCache);
+			$configuration->setQueryCacheImpl($queryCache);
+			$configuration->setResultCacheImpl($resultCache);
+			$configuration->setHydrationCacheImpl($hydrationCache);
+			$configuration->setMetadataDriverImpl($metadataDriver);
+			$configuration->setClassMetadataFactoryName($config['classMetadataFactory']);
+			$configuration->setDefaultRepositoryClassName($config['defaultRepositoryClassName']);
+			$configuration->setRepositoryFactory(new $config['repositoryFactoryClassName']);
+			$configuration->setProxyDir($config['proxyDir']);
+			$configuration->setProxyNamespace($config['proxyNamespace']);
+			$configuration->setAutoGenerateProxyClasses($config['autoGenerateProxyClasses']);
+			$configuration->setNamingStrategy(new $config['namingStrategy']);
+			$configuration->setQuoteStrategy(new $config['quoteStrategy']);
+			$configuration->setEntityListenerResolver(new $config['entityListenerResolver']);
 
 			return $configuration;
 		});
