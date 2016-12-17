@@ -68,7 +68,12 @@ class DoctrineOrmExtension
 	 */
 	public $cacheDriverClasses = [
 		'default' => 'Doctrine\Common\Cache\ArrayCache',
+		'apc' => 'Doctrine\Common\Cache\ApcCache',
+		'apcu' => 'Doctrine\Common\Cache\ApcuCache',
 		'array' => 'Doctrine\Common\Cache\ArrayCache',
+		'memcache' => 'Kdyby\DoctrineCache\MemcacheCache',
+		'memcached' => 'Kdyby\DoctrineCache\MemcachedCache',
+		'redis' => 'Kdyby\DoctrineCache\RedisCache',
 	];
 
 	/**
