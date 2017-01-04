@@ -5,6 +5,7 @@ namespace VideoRecruit\Phalcon\Doctrine\DI;
 use Doctrine\Common\Annotations\AnnotationReader;
 use Doctrine\Common\Annotations\AnnotationRegistry;
 use Doctrine\Common\Annotations\CachedReader;
+use Doctrine\Common\Cache\CacheProvider;
 use Kdyby\Doctrine\Configuration;
 use Kdyby\Doctrine\EntityManager;
 use Kdyby\Doctrine\Mapping\AnnotationDriver;
@@ -150,10 +151,21 @@ class DoctrineOrmExtension
 			$args[] = $this->di->get($cacheServiceName);
 		}
 
-		$this->di->setShared(self::PREFIX_CACHE . $suffix, function () use ($className, $args) {
+		$serviceName = self::PREFIX_CACHE . $suffix;
+		$this->di->setShared($serviceName, function () use ($className, $args, $serviceName) {
+			/** @var CacheProvider $cache */
 			$reflection = new \ReflectionClass($className);
+			$cache = $reflection->newInstanceArgs($args);
 
-			return $reflection->newInstanceArgs($args);
+			$ns = $serviceName;
+
+			if (preg_match('~^(?P<projectRoot>.+)(?:\\\\|\\/)vendor(?:\\\\|\\/)videorecruit(?:\\\\|\\/)phalcon-doctrine(?:\\\\|\\/).+\\z~i', __DIR__, $m)) {
+				$ns .= '_' . substr(md5($m['projectRoot']), 0, 8);
+			}
+
+			$cache->setNamespace($ns);
+
+			return $cache;
 		});
 	}
 
