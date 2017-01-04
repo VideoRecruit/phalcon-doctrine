@@ -73,7 +73,7 @@ class DoctrineOrmExtension
 		'apcu' => 'Doctrine\Common\Cache\ApcuCache',
 		'array' => 'Doctrine\Common\Cache\ArrayCache',
 		'memcache' => 'Kdyby\DoctrineCache\MemcacheCache',
-		'memcached' => 'Kdyby\DoctrineCache\MemcachedCache',
+		'memcached' => 'VideoRecruit\Phalcon\Doctrine\Common\Cache\MemcachedCache',
 		'redis' => 'Kdyby\DoctrineCache\RedisCache',
 	];
 
