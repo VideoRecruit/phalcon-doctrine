@@ -9,7 +9,6 @@ use Doctrine\Common\Cache\CacheProvider;
 use Kdyby\Doctrine\Configuration;
 use Kdyby\Doctrine\EntityManager;
 use Kdyby\Doctrine\Mapping\AnnotationDriver;
-use Nette\DI\Config\Helpers as ConfigHelpers;
 use Phalcon\Config;
 use Phalcon\DiInterface;
 use VideoRecruit\Phalcon\Doctrine\InvalidArgumentException;
@@ -246,7 +245,7 @@ class DoctrineOrmExtension
 	 */
 	private function mergeConfigs(array $config, array $defaults)
 	{
-		return ConfigHelpers::merge($config, $defaults);
+		return Helpers::merge($config, $defaults);
 	}
 
 	/**
