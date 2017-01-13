@@ -12,9 +12,8 @@
     ],
     "require": {
         "php": ">=5.4",
+        "ext-phalcon": "*",
         "kdyby/doctrine": "~3.0",
-        "nette/di": "~2.3",
-        "nette/reflection": "~2.3",
         "doctrine/cache": "~1.6"
     },
     "suggest": {
