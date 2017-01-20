@@ -238,7 +238,11 @@ class DoctrineOrmExtension
 		$connectionOptions = $this->resolveConfig($config, $this->connectionDefaults, $this->managerDefaults);
 
 		$this->di->setShared(self::ENTITY_MANAGER, function () use ($connectionOptions) {
-			return EntityManager::create($connectionOptions, $this->get(self::CONFIGURATION));
+			$eventManagerConstant = 'VideoRecruit\Phalcon\Events\DI\EventsExtension::EVENT_MANAGER';
+			$isEventManagerDefined = defined($eventManagerConstant);
+			$eventManager = $isEventManagerDefined ? $this->get(constant($eventManagerConstant)) : NULL;
+
+			return EntityManager::create($connectionOptions, $this->get(self::CONFIGURATION), $eventManager);
 		});
 	}
 
