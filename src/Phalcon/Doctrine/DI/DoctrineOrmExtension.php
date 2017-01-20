@@ -26,6 +26,7 @@ class DoctrineOrmExtension
 	const CONNECTION = 'videorecruit.doctrine.connection';
 	const CONFIGURATION = 'videorecruit.doctrine.configuration';
 	const METADATA_DRIVER = 'videorecruit.doctrine.metadataDriver';
+	const METADATA_READER = 'videorecruit.doctrine.metadataReader';
 
 	/**
 	 * @var DiInterface
@@ -173,11 +174,16 @@ class DoctrineOrmExtension
 	 */
 	private function loadMetadataDriver(array $config)
 	{
-		$this->di->setShared(self::METADATA_DRIVER, function () use ($config) {
+		$this->di->setShared(self::METADATA_READER, function () {
 			$annotationCache = $this->get(self::PREFIX_CACHE . 'annotations');
-			$metadataCache = $this->get(self::PREFIX_CACHE . 'metadata');
 
-			$annotationReader = new CachedReader(new AnnotationReader(), $annotationCache);
+			return new CachedReader(new AnnotationReader(), $annotationCache);
+		});
+
+		$this->di->setShared(self::METADATA_DRIVER, function () use ($config) {
+			$metadataCache = $this->get(self::PREFIX_CACHE . 'metadata');
+			$annotationReader = $this->get(self::METADATA_READER);
+
 			$driver = new AnnotationDriver($config['metadata'], $annotationReader, $metadataCache);
 
 			AnnotationRegistry::registerLoader("class_exists");
