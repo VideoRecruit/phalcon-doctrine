@@ -7,6 +7,7 @@ use Doctrine\Common\Annotations\AnnotationRegistry;
 use Doctrine\Common\Annotations\CachedReader;
 use Doctrine\Common\Cache\CacheProvider;
 use Kdyby\Doctrine\Configuration;
+use Kdyby\Doctrine\Diagnostics\Panel;
 use Kdyby\Doctrine\EntityManager;
 use Kdyby\Doctrine\Mapping\AnnotationDriver;
 use Phalcon\Config;
@@ -27,6 +28,7 @@ class DoctrineOrmExtension
 	const CONFIGURATION = 'videorecruit.doctrine.configuration';
 	const METADATA_DRIVER = 'videorecruit.doctrine.metadataDriver';
 	const METADATA_READER = 'videorecruit.doctrine.metadataReader';
+	const TRACY_PANEL = 'videorecruit.doctrine.diagnosticsPanel';
 
 	/**
 	 * @var DiInterface
@@ -102,6 +104,8 @@ class DoctrineOrmExtension
 		$this->loadCache('query', $config['queryCache']);
 		$this->loadCache('ormResult', $config['resultCache']);
 		$this->loadCache('hydration', $config['hydrationCache']);
+
+		$this->loadDebugTools();
 
 		$this->loadMetadataDriver($config);
 		$this->loadConfiguration($config);
@@ -242,7 +246,33 @@ class DoctrineOrmExtension
 			$isEventManagerDefined = defined($eventManagerConstant);
 			$eventManager = $isEventManagerDefined ? $this->get(constant($eventManagerConstant)) : NULL;
 
-			return EntityManager::create($connectionOptions, $this->get(self::CONFIGURATION), $eventManager);
+			$entityManager = EntityManager::create($connectionOptions, $this->get(self::CONFIGURATION), $eventManager);
+
+			// bind entity manager to the tracy panel when tracy is available
+			if ($this->has(self::TRACY_PANEL)) {
+				/** @var Panel $panel */
+				$panel = $this->get(self::TRACY_PANEL);
+				$panel->bindEntityManager($entityManager);
+				$panel->enableLogging();
+			}
+
+			return $entityManager;
+		});
+	}
+
+	/**
+	 * Register debugging service like a Tracy panel etc.
+	 */
+	private function loadDebugTools()
+	{
+		// register tracy services just in case tracy is available
+		if (!interface_exists('Tracy\IBarPanel')) {
+			return;
+		}
+
+		// register kdyby/doctrine tracy panel
+		$this->di->setShared(self::TRACY_PANEL, function () {
+			return new Panel;
 		});
 	}
 
